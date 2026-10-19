@@ -1,0 +1,7 @@
+target/
+*.iml
+.idea/
+.vscode/
+.DS_Store
+deploy/helm/*/charts/
+deploy/helm/*/Chart.lock
