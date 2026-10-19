@@ -1,0 +1,117 @@
+openapi: 3.1.0
+info:
+  title: Action catalog (TMF620 Product Catalog Management, ProductOffering subset)
+  version: 0.1.0
+  description: |
+    Next best actions are modelled as TMF620 ProductOfferings with @type NbaActionOffering.
+    Any recommendable action fits: an offer, a message, a service action, a retention save.
+servers:
+  - url: /tmf-api/productCatalogManagement/v4
+paths:
+  /productOffering:
+    parameters:
+      - $ref: 'common.yaml#/components/parameters/TenantId'
+    get:
+      operationId: listProductOffering
+      parameters:
+        - { name: lifecycleStatus, in: query, schema: { type: string } }
+        - $ref: 'common.yaml#/components/parameters/Offset'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Offerings, newest change first
+          headers:
+            X-Total-Count: { $ref: 'common.yaml#/components/headers/X-Total-Count' }
+            X-Result-Count: { $ref: 'common.yaml#/components/headers/X-Result-Count' }
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/ProductOffering' } }
+        '400': { $ref: 'common.yaml#/components/responses/Error' }
+    post:
+      operationId: createProductOffering
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductOffering_Create' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductOffering' }
+        '400': { $ref: 'common.yaml#/components/responses/Error' }
+  /productOffering/{id}:
+    parameters:
+      - $ref: 'common.yaml#/components/parameters/TenantId'
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: retrieveProductOffering
+      responses:
+        '200':
+          description: The offering
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductOffering' }
+        '404': { $ref: 'common.yaml#/components/responses/Error' }
+    patch:
+      operationId: patchProductOffering
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/ProductOffering_Update' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProductOffering' }
+        '400': { $ref: 'common.yaml#/components/responses/Error' }
+        '404': { $ref: 'common.yaml#/components/responses/Error' }
+    delete:
+      operationId: deleteProductOffering
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: 'common.yaml#/components/responses/Error' }
+components:
+  schemas:
+    PropensityModel:
+      type: object
+      description: Logistic model, p = sigmoid(intercept + sum(coefficients[f] * attribute[f]))
+      properties:
+        version: { type: string }
+        intercept: { type: number }
+        coefficients: { type: object, additionalProperties: { type: number } }
+    ProductOffering_Update:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        lifecycleStatus:
+          type: string
+          description: Decisioning uses offerings in status Active or Launched.
+          examples: [In design, Active, Launched, Retired]
+        validFor: { $ref: 'common.yaml#/components/schemas/TimePeriod' }
+        category: { type: array, items: { $ref: 'common.yaml#/components/schemas/Ref' } }
+        channel:
+          type: array
+          description: Channels the action may be shown on. Empty means every channel.
+          items: { $ref: 'common.yaml#/components/schemas/Ref' }
+        businessValue: { type: number, minimum: 0, description: Value of a positive response. 0 means non-monetary. }
+        propensityModel: { $ref: '#/components/schemas/PropensityModel' }
+    ProductOffering_Create:
+      allOf:
+        - $ref: '#/components/schemas/ProductOffering_Update'
+        - required: [name]
+    ProductOffering:
+      allOf:
+        - $ref: '#/components/schemas/ProductOffering_Update'
+        - type: object
+          properties:
+            id: { type: string }
+            href: { type: string }
+            version: { type: string }
+            lastUpdate: { type: string, format: date-time }
+            '@type': { type: string, const: NbaActionOffering }
+            '@baseType': { type: string, const: ProductOffering }

@@ -1,0 +1,115 @@
+openapi: 3.1.0
+info:
+  title: Campaigns (TMF671 Promotion Management, Promotion subset)
+  version: 0.1.0
+  description: Campaigns are TMF671 Promotions with @type NbaCampaign.
+servers:
+  - url: /tmf-api/promotionManagement/v4
+paths:
+  /promotion:
+    parameters:
+      - $ref: 'common.yaml#/components/parameters/TenantId'
+    get:
+      operationId: listPromotion
+      parameters:
+        - { name: lifecycleStatus, in: query, schema: { type: string } }
+        - $ref: 'common.yaml#/components/parameters/Offset'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Campaigns
+          headers:
+            X-Total-Count: { $ref: 'common.yaml#/components/headers/X-Total-Count' }
+            X-Result-Count: { $ref: 'common.yaml#/components/headers/X-Result-Count' }
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/Promotion' } }
+    post:
+      operationId: createPromotion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Promotion_Create' }
+      responses:
+        '201':
+          description: Created (lifecycleStatus defaults to draft)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Promotion' }
+        '400': { $ref: 'common.yaml#/components/responses/Error' }
+  /promotion/{id}:
+    parameters:
+      - $ref: 'common.yaml#/components/parameters/TenantId'
+      - { name: id, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: retrievePromotion
+      responses:
+        '200':
+          description: The campaign
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Promotion' }
+        '404': { $ref: 'common.yaml#/components/responses/Error' }
+    patch:
+      operationId: patchPromotion
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema: { $ref: '#/components/schemas/Promotion_Update' }
+      responses:
+        '200':
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Promotion' }
+        '400': { $ref: 'common.yaml#/components/responses/Error' }
+        '404': { $ref: 'common.yaml#/components/responses/Error' }
+    delete:
+      operationId: deletePromotion
+      responses:
+        '204': { description: Deleted }
+        '404': { $ref: 'common.yaml#/components/responses/Error' }
+components:
+  schemas:
+    PromotionAction:
+      type: object
+      required: [actionObjectId]
+      properties:
+        actionType: { type: string, const: recommendOffering }
+        actionObjectId: { type: string, description: Id of a ProductOffering in the action catalog }
+        priorityLever: { type: number, exclusiveMinimum: 0, default: 1.0 }
+    Promotion_Update:
+      type: object
+      properties:
+        name: { type: string }
+        description: { type: string }
+        lifecycleStatus:
+          type: string
+          description: Decisioning uses campaigns in status active.
+          examples: [draft, active, suspended, retired]
+        validFor: { $ref: 'common.yaml#/components/schemas/TimePeriod' }
+        channel: { type: array, items: { $ref: 'common.yaml#/components/schemas/Ref' } }
+        eligibilityRule:
+          type: string
+          description: Expression over decision attributes, see docs/eligibility-rules.md
+          examples: ["tenureMonths >= 12 and segment == 'gold'"]
+        controlGroupPercent: { type: number, minimum: 0, maximum: 50, default: 0 }
+        maxImpressionsPerDay: { type: integer, minimum: 0, default: 0, description: 0 means no cap }
+        action: { type: array, minItems: 1, items: { $ref: '#/components/schemas/PromotionAction' } }
+    Promotion_Create:
+      allOf:
+        - $ref: '#/components/schemas/Promotion_Update'
+        - required: [name, action]
+    Promotion:
+      allOf:
+        - $ref: '#/components/schemas/Promotion_Update'
+        - type: object
+          properties:
+            id: { type: string }
+            href: { type: string }
+            version: { type: string }
+            lastUpdate: { type: string, format: date-time }
+            '@type': { type: string, const: NbaCampaign }
+            '@baseType': { type: string, const: Promotion }

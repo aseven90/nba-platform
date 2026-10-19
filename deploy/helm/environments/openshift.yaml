@@ -1,0 +1,6 @@
+# Overlay for OpenShift: let the restricted-v2 SCC assign UIDs and expose APIs through Routes.
+#   helm install catalog deploy/helm/action-catalog-service -f deploy/helm/environments/openshift.yaml
+openshift:
+  enabled: true
+  route:
+    enabled: true

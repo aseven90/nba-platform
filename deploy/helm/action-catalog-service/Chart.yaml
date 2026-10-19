@@ -1,0 +1,10 @@
+apiVersion: v2
+name: action-catalog-service
+description: Action catalog (TMF620 ProductOffering)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: nba-common
+    version: 0.1.0
+    repository: file://../nba-common
