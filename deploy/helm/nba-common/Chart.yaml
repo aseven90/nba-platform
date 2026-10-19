@@ -1,0 +1,5 @@
+apiVersion: v2
+name: nba-common
+description: Library chart with the Kubernetes resources every NBA platform service shares.
+type: library
+version: 0.1.0

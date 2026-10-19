@@ -1,0 +1,50 @@
+# Strimzi / Red Hat AMQ Streams topic definitions (kubectl apply -n <kafka-namespace> -f deploy/kafka/topics.yaml).
+# On a managed Kafka service, create the same topics with the same configs.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: nba.catalog.offering.changed
+  labels: { strimzi.io/cluster: nba }
+spec:
+  partitions: 12
+  replicas: 3
+  config:
+    cleanup.policy: compact
+    min.insync.replicas: "2"
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: nba.campaign.changed
+  labels: { strimzi.io/cluster: nba }
+spec:
+  partitions: 12
+  replicas: 3
+  config:
+    cleanup.policy: compact
+    min.insync.replicas: "2"
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: nba.decision.made
+  labels: { strimzi.io/cluster: nba }
+spec:
+  # Partition count caps consumer parallelism; sized for ~2k decisions/s with headroom.
+  partitions: 48
+  replicas: 3
+  config:
+    retention.ms: "2592000000" # 30 days; archive to the lakehouse for longer audit retention
+    min.insync.replicas: "2"
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: nba.interaction.recorded
+  labels: { strimzi.io/cluster: nba }
+spec:
+  partitions: 48
+  replicas: 3
+  config:
+    retention.ms: "2592000000"
+    min.insync.replicas: "2"

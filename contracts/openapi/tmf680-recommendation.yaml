@@ -1,0 +1,83 @@
+openapi: 3.1.0
+info:
+  title: Decisions (TMF680 Recommendation Management)
+  version: 0.1.0
+  description: |
+    Real-time next best action decisions. The response always succeeds when the request is valid: if the
+    decision pipeline fails or misses its deadline, the configured safe default actions are returned with
+    fallback=true.
+servers:
+  - url: /tmf-api/recommendationManagement/v4
+paths:
+  /recommendation:
+    post:
+      operationId: createRecommendation
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/TenantId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Recommendation_Create' }
+            example:
+              relatedParty: [{ id: party-42, role: customer }]
+              channel: { id: web }
+              characteristic:
+                - { name: tenureMonths, value: 24 }
+                - { name: segment, value: gold }
+                - { name: consent.web, value: true }
+              maxItems: 3
+      responses:
+        '201':
+          description: Ranked next best actions
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Recommendation' }
+        '400': { $ref: 'common.yaml#/components/responses/Error' }
+components:
+  schemas:
+    Characteristic:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        value: {}
+    Recommendation_Create:
+      type: object
+      required: [relatedParty, channel]
+      properties:
+        relatedParty:
+          type: array
+          minItems: 1
+          description: The first party is the subject of the decision.
+          items: { $ref: 'common.yaml#/components/schemas/Ref' }
+        channel: { $ref: 'common.yaml#/components/schemas/Ref' }
+        characteristic:
+          type: array
+          description: Decision context. Reserved names are optOut and consent.<channel>.
+          items: { $ref: '#/components/schemas/Characteristic' }
+        maxItems: { type: integer, minimum: 1, default: 3 }
+    RecommendationItem:
+      type: object
+      properties:
+        id: { type: string }
+        priority: { type: integer, description: Rank, 1 is best }
+        productOffering: { $ref: 'common.yaml#/components/schemas/Ref' }
+        promotion: { $ref: 'common.yaml#/components/schemas/Ref' }
+        score: { type: number, description: Arbitration priority (propensity x value x lever) }
+        propensity: { type: number }
+        reasonCode: { type: array, items: { type: string } }
+        '@type': { type: string, const: NbaRecommendationItem }
+    Recommendation:
+      type: object
+      properties:
+        id: { type: string, description: Decision id; quote it when recording interactions }
+        name: { type: string }
+        type: { type: string, const: nextBestAction }
+        validFor: { $ref: 'common.yaml#/components/schemas/TimePeriod' }
+        channel: { $ref: 'common.yaml#/components/schemas/Ref' }
+        relatedParty: { type: array, items: { $ref: 'common.yaml#/components/schemas/Ref' } }
+        recommendationItem: { type: array, items: { $ref: '#/components/schemas/RecommendationItem' } }
+        fallback: { type: boolean, description: True when the safe default answer was returned }
+        '@type': { type: string, const: NbaRecommendation }
+        '@baseType': { type: string, const: Recommendation }

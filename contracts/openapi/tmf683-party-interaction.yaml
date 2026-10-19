@@ -1,0 +1,86 @@
+openapi: 3.1.0
+info:
+  title: Interactions (TMF683 Party Interaction Management, PartyInteraction subset)
+  version: 0.1.0
+  description: Impressions and responses to recommendations, which feed contact policy and learning.
+servers:
+  - url: /tmf-api/partyInteractionManagement/v4
+paths:
+  /partyInteraction:
+    parameters:
+      - $ref: 'common.yaml#/components/parameters/TenantId'
+    post:
+      operationId: createPartyInteraction
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          description: Retries with the same key return the original interaction (200) instead of a duplicate.
+          schema: { type: string, maxLength: 128 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PartyInteraction_Create' }
+      responses:
+        '201':
+          description: Recorded
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PartyInteraction' }
+        '200':
+          description: Already recorded under this Idempotency-Key
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PartyInteraction' }
+        '400': { $ref: 'common.yaml#/components/responses/Error' }
+    get:
+      operationId: listPartyInteraction
+      parameters:
+        - { name: relatedParty.id, in: query, schema: { type: string } }
+        - $ref: 'common.yaml#/components/parameters/Offset'
+        - $ref: 'common.yaml#/components/parameters/Limit'
+      responses:
+        '200':
+          description: Interactions, newest first
+          headers:
+            X-Total-Count: { $ref: 'common.yaml#/components/headers/X-Total-Count' }
+            X-Result-Count: { $ref: 'common.yaml#/components/headers/X-Result-Count' }
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/PartyInteraction' } }
+  /partyInteraction/{id}:
+    get:
+      operationId: retrievePartyInteraction
+      parameters:
+        - $ref: 'common.yaml#/components/parameters/TenantId'
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The interaction
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PartyInteraction' }
+        '404': { $ref: 'common.yaml#/components/responses/Error' }
+components:
+  schemas:
+    PartyInteraction_Create:
+      type: object
+      required: [relatedParty, channel, productOffering, outcome]
+      properties:
+        interactionDate: { type: string, format: date-time }
+        relatedParty: { type: array, minItems: 1, items: { $ref: 'common.yaml#/components/schemas/Ref' } }
+        channel: { type: array, minItems: 1, items: { $ref: 'common.yaml#/components/schemas/Ref' } }
+        decisionId: { type: string, description: Recommendation id this interaction responds to }
+        productOffering: { $ref: 'common.yaml#/components/schemas/Ref' }
+        promotion: { $ref: 'common.yaml#/components/schemas/Ref' }
+        outcome: { type: string, enum: [IMPRESSION, ACCEPTED, DECLINED, IGNORED] }
+    PartyInteraction:
+      allOf:
+        - $ref: '#/components/schemas/PartyInteraction_Create'
+        - type: object
+          properties:
+            id: { type: string }
+            href: { type: string }
+            '@type': { type: string, const: NbaInteraction }
+            '@baseType': { type: string, const: PartyInteraction }

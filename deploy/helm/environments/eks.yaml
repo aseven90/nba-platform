@@ -1,0 +1,7 @@
+# Overlay for Amazon EKS with the AWS Load Balancer Controller.
+ingress:
+  enabled: true
+  className: alb
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internal
+    alb.ingress.kubernetes.io/target-type: ip
