@@ -1,0 +1,2 @@
+io.nbaplatform.platform.PlatformWebAutoConfiguration
+io.nbaplatform.platform.outbox.OutboxAutoConfiguration

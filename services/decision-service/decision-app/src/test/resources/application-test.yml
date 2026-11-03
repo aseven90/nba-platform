@@ -1,0 +1,15 @@
+spring:
+  kafka:
+    listener:
+      auto-startup: false
+nba:
+  decision:
+    deadline: 500ms
+    safe-defaults:
+      acme: [safe-1]
+    plugins:
+      thompson-sampling:
+        enabled: false
+management:
+  tracing:
+    enabled: false

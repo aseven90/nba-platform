@@ -1,0 +1,167 @@
+asyncapi: 3.0.0
+info:
+  title: NBA platform events
+  version: 0.1.0
+  description: |
+    All events use the CloudEvents 1.0 structured JSON envelope with a `tenantid` extension attribute.
+    Message keys are `<tenantId>:<aggregateId>` so all events for one entity land on one partition, in order.
+    Delivery is at-least-once; consumers deduplicate on the CloudEvents `id`.
+    Java bindings: libs/event-contracts.
+defaultContentType: application/cloudevents+json
+channels:
+  offeringChanged:
+    address: nba.catalog.offering.changed
+    description: Compacted. Latest state of each action offering. Producer action-catalog-service.
+    messages:
+      offeringChanged: { $ref: '#/components/messages/OfferingChanged' }
+  campaignChanged:
+    address: nba.campaign.changed
+    description: Compacted. Latest state of each campaign. Producer campaign-service.
+    messages:
+      campaignChanged: { $ref: '#/components/messages/CampaignChanged' }
+  decisionMade:
+    address: nba.decision.made
+    description: Append-only decision log, keyed by tenant and party. Producer decision-service.
+    messages:
+      decisionMade: { $ref: '#/components/messages/DecisionMade' }
+  interactionRecorded:
+    address: nba.interaction.recorded
+    description: Impressions and responses, keyed by tenant and party. Producer interaction-service.
+    messages:
+      interactionRecorded: { $ref: '#/components/messages/InteractionRecorded' }
+operations:
+  publishOfferingChanged:
+    action: send
+    channel: { $ref: '#/channels/offeringChanged' }
+  publishCampaignChanged:
+    action: send
+    channel: { $ref: '#/channels/campaignChanged' }
+  publishDecisionMade:
+    action: send
+    channel: { $ref: '#/channels/decisionMade' }
+  publishInteractionRecorded:
+    action: send
+    channel: { $ref: '#/channels/interactionRecorded' }
+components:
+  schemas:
+    Envelope:
+      type: object
+      required: [specversion, id, source, type, time, tenantid, subject, data]
+      properties:
+        specversion: { type: string, const: '1.0' }
+        id: { type: string }
+        source: { type: string }
+        type: { type: string }
+        time: { type: string, format: date-time }
+        tenantid: { type: string }
+        subject: { type: string, description: Aggregate id (offering, campaign or party) }
+    ValidFor:
+      type: object
+      properties:
+        startDateTime: { type: string, format: date-time }
+        endDateTime: { type: string, format: date-time }
+    OfferingChangedData:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        category: { type: string }
+        lifecycleStatus: { type: string }
+        channels: { type: array, items: { type: string } }
+        businessValue: { type: number }
+        validFor: { $ref: '#/components/schemas/ValidFor' }
+        propensityModel:
+          type: object
+          properties:
+            version: { type: string }
+            intercept: { type: number }
+            coefficients: { type: object, additionalProperties: { type: number } }
+        deleted: { type: boolean }
+        version: { type: integer }
+    CampaignChangedData:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        lifecycleStatus: { type: string }
+        validFor: { $ref: '#/components/schemas/ValidFor' }
+        channels: { type: array, items: { type: string } }
+        eligibilityRule: { type: string }
+        controlGroupPercent: { type: number }
+        maxImpressionsPerDay: { type: integer }
+        actions:
+          type: array
+          items:
+            type: object
+            properties:
+              offeringId: { type: string }
+              priorityLever: { type: number }
+        deleted: { type: boolean }
+        version: { type: integer }
+    DecisionMadeData:
+      type: object
+      properties:
+        decisionId: { type: string }
+        partyId: { type: string }
+        channel: { type: string }
+        decidedAt: { type: string, format: date-time }
+        fallback: { type: boolean }
+        strategy: { type: string, description: Ordered stage names, or safe-default }
+        latencyMicros: { type: integer }
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              rank: { type: integer }
+              offeringId: { type: string }
+              campaignId: { type: string }
+              priority: { type: number }
+              propensity: { type: number }
+              businessValue: { type: number }
+              reasonCodes: { type: array, items: { type: string } }
+        suppressed:
+          type: array
+          items:
+            type: object
+            properties:
+              offeringId: { type: string }
+              campaignId: { type: string }
+              reasonCode: { type: string }
+    InteractionRecordedData:
+      type: object
+      properties:
+        interactionId: { type: string }
+        partyId: { type: string }
+        decisionId: { type: string }
+        offeringId: { type: string }
+        campaignId: { type: string }
+        channel: { type: string }
+        outcome: { type: string, enum: [IMPRESSION, ACCEPTED, DECLINED, IGNORED] }
+        occurredAt: { type: string, format: date-time }
+  messages:
+    OfferingChanged:
+      name: io.nbaplatform.catalog.offering.changed.v1
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - properties: { data: { $ref: '#/components/schemas/OfferingChangedData' } }
+    CampaignChanged:
+      name: io.nbaplatform.campaign.changed.v1
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - properties: { data: { $ref: '#/components/schemas/CampaignChangedData' } }
+    DecisionMade:
+      name: io.nbaplatform.decision.made.v1
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - properties: { data: { $ref: '#/components/schemas/DecisionMadeData' } }
+    InteractionRecorded:
+      name: io.nbaplatform.interaction.recorded.v1
+      payload:
+        allOf:
+          - $ref: '#/components/schemas/Envelope'
+          - properties: { data: { $ref: '#/components/schemas/InteractionRecordedData' } }

@@ -1,0 +1,67 @@
+image:
+  repository: ghcr.io/aseven90/nba-platform/decision-service
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 3
+containerPort: 8080
+terminationGracePeriodSeconds: 30
+
+env:
+  KAFKA_BOOTSTRAP_SERVERS: nba-kafka-bootstrap:9092
+  TRACING_SAMPLING: "0.1"
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: http://otel-collector:4318/v1/traces
+  # Safe default answer per tenant: offering ids returned when a decision cannot be made.
+  # NBA_DECISION_SAFEDEFAULTS_DEFAULT_0: some-offering-id
+
+envFromSecret: ""
+
+resources:
+  requests:
+    cpu: "1"
+    memory: 1Gi
+  limits:
+    cpu: "2"
+    memory: 1536Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 40
+  targetCPUUtilizationPercentage: 65
+  # Additional autoscaling/v2 metrics, for example requests per second from a metrics adapter.
+  extraMetrics: []
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+securityContext:
+  runAsUser: 10001
+
+# Service mesh is optional: add istio.io/dataplane-mode or linkerd.io/inject here, see docs/deployment.md.
+podAnnotations: {}
+
+topologySpread:
+  enabled: true
+nodeSelector: {}
+tolerations: []
+
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  annotations: {}
+  tls: []
+
+openshift:
+  enabled: false
+  route:
+    enabled: false
+    host: ""
+
+serviceMonitor:
+  enabled: false

@@ -1,0 +1,10 @@
+apiVersion: v2
+name: interaction-service
+description: Interaction capture (TMF683 PartyInteraction)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+dependencies:
+  - name: nba-common
+    version: 0.1.0
+    repository: file://../nba-common

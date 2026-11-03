@@ -1,0 +1,74 @@
+image:
+  repository: ghcr.io/aseven90/nba-platform/console
+  tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+replicaCount: 2
+containerPort: 8080
+terminationGracePeriodSeconds: 10
+
+# Where nginx routes each TMF API. Defaults match the service names used in docs/deployment.md.
+env:
+  CATALOG_URL: http://action-catalog-service
+  CAMPAIGN_URL: http://campaign-service
+  DECISION_URL: http://decision-service
+  INTERACTION_URL: http://interaction-service
+envFromSecret: ""
+
+# nginx renders its config into conf.d at start-up; the root filesystem stays read-only.
+writablePaths:
+  - name: nginx-conf
+    path: /etc/nginx/conf.d
+
+metrics:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 32Mi
+  limits:
+    cpu: 500m
+    memory: 128Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 4
+  targetCPUUtilizationPercentage: 70
+  extraMetrics: []
+
+pdb:
+  enabled: true
+  minAvailable: 1
+
+securityContext:
+  runAsUser: 101
+
+podAnnotations: {}
+
+topologySpread:
+  enabled: true
+nodeSelector: {}
+tolerations: []
+
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  path: /
+  annotations: {}
+  tls: []
+
+openshift:
+  enabled: false
+  route:
+    enabled: false
+    host: ""
+    path: /
+
+serviceMonitor:
+  enabled: false
