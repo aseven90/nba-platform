@@ -78,6 +78,11 @@ Open the console at http://localhost:3000, click **Load demo data** on the Overv
 candidates were dropped and why. Record Shown, Accepted or Declined on a result and it appears under
 **Interactions**. The tenant switch in the sidebar keeps test data apart.
 
+If port 3000 (or any other) is already taken, pick another one:
+`CONSOLE_PORT=8090 docker compose -f deploy/compose/docker-compose.yml up --build`, then open
+http://localhost:8090. `CATALOG_PORT`, `CAMPAIGN_PORT`, `DECISION_PORT`, `INTERACTION_PORT`, `POSTGRES_PORT` and
+`KAFKA_PORT` work the same way; the list is at the top of the compose file.
+
 ### Console development
 
 ```bash
