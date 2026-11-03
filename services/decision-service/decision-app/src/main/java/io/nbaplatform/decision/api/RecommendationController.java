@@ -19,6 +19,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -43,7 +44,8 @@ public class RecommendationController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Recommendation recommend(@Valid @RequestBody RecommendationRequest body) {
+    public Recommendation recommend(@Valid @RequestBody RecommendationRequest body,
+                                    @RequestParam(defaultValue = "false") boolean explain) {
         int maxItems = body.maxItems() == null ? properties.defaultMaxItems() : body.maxItems();
         if (maxItems > properties.maxItemsLimit()) {
             throw new IllegalArgumentException("maxItems must be at most " + properties.maxItemsLimit());
@@ -60,10 +62,10 @@ public class RecommendationController {
 
         DecisionOutcome outcome = engine.decide(request);
         decisionLog.publish(outcome, engine.strategy());
-        return toResource(outcome);
+        return toResource(outcome, explain);
     }
 
-    private static Recommendation toResource(DecisionOutcome outcome) {
+    private static Recommendation toResource(DecisionOutcome outcome, boolean explain) {
         List<Recommendation.RecommendationItem> items = new ArrayList<>();
         for (int i = 0; i < outcome.items().size(); i++) {
             Candidate c = outcome.items().get(i);
@@ -78,6 +80,15 @@ public class RecommendationController {
                     c.reasonCodes(),
                     "NbaRecommendationItem"));
         }
+        List<Recommendation.SuppressedItem> suppressed = !explain ? null : outcome.suppressed().stream()
+                .map(s -> new Recommendation.SuppressedItem(
+                        new Recommendation.Ref(s.candidate().offering().id(), s.candidate().offering().name(), null,
+                                "ProductOffering"),
+                        s.candidate().campaign() == null ? null : new Recommendation.Ref(s.candidate().campaign().id(),
+                                s.candidate().campaign().name(), null, "Promotion"),
+                        s.stage(),
+                        s.reasonCode()))
+                .toList();
         Instant now = outcome.request().now();
         return new Recommendation(
                 outcome.decisionId(),
@@ -87,6 +98,7 @@ public class RecommendationController {
                 new Recommendation.Ref(outcome.request().channel(), null, null, "Channel"),
                 List.of(new Recommendation.Ref(outcome.request().partyId(), null, "customer", "Party")),
                 items,
+                suppressed,
                 outcome.fallback(),
                 "NbaRecommendation",
                 "Recommendation");

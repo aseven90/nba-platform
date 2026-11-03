@@ -27,12 +27,19 @@ for m in services/action-catalog-service services/campaign-service services/deci
   docker build --build-arg MODULE=$m -t ghcr.io/aseven90/nba-platform/$name:0.1.0 .
   kind load docker-image ghcr.io/aseven90/nba-platform/$name:0.1.0 --name nba
 done
+docker build -t ghcr.io/aseven90/nba-platform/console:0.1.0 ui/console
+kind load docker-image ghcr.io/aseven90/nba-platform/console:0.1.0 --name nba
 # Install Kafka (e.g. Strimzi) and PostgreSQL, apply deploy/kafka/topics.yaml, create the <service>-db secrets, then:
-for c in action-catalog-service campaign-service decision-service interaction-service; do
+for c in action-catalog-service campaign-service decision-service interaction-service console; do
   helm dependency build deploy/helm/$c
   helm upgrade --install $c deploy/helm/$c -f deploy/helm/environments/kind.yaml
 done
+kubectl port-forward svc/console 3000:80   # then open http://localhost:3000
 ```
+
+The console chart routes `/` to the console; its nginx proxies `/tmf-api/...` to the four services by their
+in-cluster names (override with `env.CATALOG_URL` and friends). The console has no authentication yet,
+so expose it only on trusted networks.
 
 ## Amazon EKS
 

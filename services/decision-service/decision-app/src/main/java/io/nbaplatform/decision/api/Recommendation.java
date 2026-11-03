@@ -5,7 +5,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import io.nbaplatform.events.ValidFor;
 import java.util.List;
 
-/** TMF680 Recommendation, extended as {@code NbaRecommendation}. Its id is the decision id. */
+/**
+ * TMF680 Recommendation, extended as {@code NbaRecommendation}. Its id is the decision id. {@code suppressedItem}
+ * is only present when the caller asks for an explanation ({@code ?explain=true}).
+ */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record Recommendation(
         String id,
@@ -15,6 +18,7 @@ public record Recommendation(
         Ref channel,
         List<Ref> relatedParty,
         List<RecommendationItem> recommendationItem,
+        List<SuppressedItem> suppressedItem,
         boolean fallback,
         @JsonProperty("@type") String atType,
         @JsonProperty("@baseType") String baseType) {
@@ -34,5 +38,10 @@ public record Recommendation(
             Double propensity,
             List<String> reasonCode,
             @JsonProperty("@type") String atType) {
+    }
+
+    /** A candidate the pipeline removed, with the stage that removed it and why. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public record SuppressedItem(Ref productOffering, Ref promotion, String stage, String reasonCode) {
     }
 }

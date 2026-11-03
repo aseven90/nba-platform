@@ -1,5 +1,9 @@
-# Local stack: PostgreSQL, a Kafka-API broker (Redpanda) and the four services.
+# Local stack: PostgreSQL, a Kafka-API broker (Redpanda), the four services and the console (http://localhost:3000).
 #   docker compose -f deploy/compose/docker-compose.yml up --build
+# Host ports can be changed if they clash with something already running, e.g.
+#   CONSOLE_PORT=8090 docker compose -f deploy/compose/docker-compose.yml up --build
+# Variables (default): CONSOLE_PORT (3000), CATALOG_PORT (8081), CAMPAIGN_PORT (8082), DECISION_PORT (8083),
+#   INTERACTION_PORT (8084), POSTGRES_PORT (5432), KAFKA_PORT (19092). They can also go in deploy/compose/.env.
 name: nba-platform
 
 x-service: &service
@@ -30,19 +34,19 @@ services:
       test: ["CMD-SHELL", "pg_isready -U nba"]
       interval: 5s
       retries: 20
-    ports: ["5432:5432"]
+    ports: ["${POSTGRES_PORT:-5432}:5432"]
 
   redpanda:
     image: redpandadata/redpanda:v24.2.7
     command:
       - redpanda start --mode dev-container --smp 1 --memory 1G
       - --kafka-addr internal://0.0.0.0:9092,external://0.0.0.0:19092
-      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:19092
+      - --advertise-kafka-addr internal://redpanda:9092,external://localhost:${KAFKA_PORT:-19092}
     healthcheck:
       test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
       interval: 5s
       retries: 20
-    ports: ["19092:19092"]
+    ports: ["${KAFKA_PORT:-19092}:19092"]
 
   topics:
     image: redpandadata/redpanda:v24.2.7
@@ -61,7 +65,7 @@ services:
     environment:
       <<: *env
       DB_URL: jdbc:postgresql://postgres:5432/catalog
-    ports: ["8081:8080"]
+    ports: ["${CATALOG_PORT:-8081}:8080"]
 
   campaign-service:
     <<: *service
@@ -69,14 +73,14 @@ services:
     environment:
       <<: *env
       DB_URL: jdbc:postgresql://postgres:5432/campaign
-    ports: ["8082:8080"]
+    ports: ["${CAMPAIGN_PORT:-8082}:8080"]
 
   decision-service:
     <<: *service
     build: { context: ../.., args: { MODULE: services/decision-service/decision-app } }
     environment:
       <<: *env
-    ports: ["8083:8080"]
+    ports: ["${DECISION_PORT:-8083}:8080"]
 
   interaction-service:
     <<: *service
@@ -84,4 +88,19 @@ services:
     environment:
       <<: *env
       DB_URL: jdbc:postgresql://postgres:5432/interaction
-    ports: ["8084:8080"]
+    ports: ["${INTERACTION_PORT:-8084}:8080"]
+
+  console:
+    build: { context: ../../ui/console }
+    restart: unless-stopped
+    depends_on:
+      - action-catalog-service
+      - campaign-service
+      - decision-service
+      - interaction-service
+    environment:
+      CATALOG_URL: http://action-catalog-service:8080
+      CAMPAIGN_URL: http://campaign-service:8080
+      DECISION_URL: http://decision-service:8080
+      INTERACTION_URL: http://interaction-service:8080
+    ports: ["${CONSOLE_PORT:-3000}:8080"]

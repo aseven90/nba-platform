@@ -14,6 +14,11 @@ paths:
       operationId: createRecommendation
       parameters:
         - $ref: 'common.yaml#/components/parameters/TenantId'
+        - name: explain
+          in: query
+          required: false
+          description: When true, the response also lists every suppressed candidate with its stage and reason.
+          schema: { type: boolean, default: false }
       requestBody:
         required: true
         content:
@@ -68,6 +73,13 @@ components:
         propensity: { type: number }
         reasonCode: { type: array, items: { type: string } }
         '@type': { type: string, const: NbaRecommendationItem }
+    SuppressedItem:
+      type: object
+      properties:
+        productOffering: { $ref: 'common.yaml#/components/schemas/Ref' }
+        promotion: { $ref: 'common.yaml#/components/schemas/Ref' }
+        stage: { type: string, description: Pipeline stage that removed the candidate }
+        reasonCode: { type: string, examples: [RULE_NOT_MET, CONTACT_CAP_REACHED, CONTROL_GROUP, RANKED_OUT] }
     Recommendation:
       type: object
       properties:
@@ -78,6 +90,10 @@ components:
         channel: { $ref: 'common.yaml#/components/schemas/Ref' }
         relatedParty: { type: array, items: { $ref: 'common.yaml#/components/schemas/Ref' } }
         recommendationItem: { type: array, items: { $ref: '#/components/schemas/RecommendationItem' } }
+        suppressedItem:
+          type: array
+          description: Only with explain=true
+          items: { $ref: '#/components/schemas/SuppressedItem' }
         fallback: { type: boolean, description: True when the safe default answer was returned }
         '@type': { type: string, const: NbaRecommendation }
         '@baseType': { type: string, const: Recommendation }

@@ -67,7 +67,8 @@ class RecommendationApiTest {
                 .andExpect(jsonPath("$.recommendationItem[0].priority").value(1))
                 .andExpect(jsonPath("$.recommendationItem[0].promotion.id").value("growth"))
                 .andExpect(jsonPath("$.recommendationItem[1].productOffering.id").value("addon"))
-                .andExpect(jsonPath("$.recommendationItem[0].reasonCode[0]").value("MODEL_v1"));
+                .andExpect(jsonPath("$.recommendationItem[0].reasonCode[0]").value("MODEL_v1"))
+                .andExpect(jsonPath("$.suppressedItem").doesNotExist());
 
         ArgumentCaptor<String> event = ArgumentCaptor.forClass(String.class);
         verify(kafka).send(eq(Topics.DECISION_MADE), eq("acme:party-42"), event.capture());
@@ -77,6 +78,24 @@ class RecommendationApiTest {
         assertThat(logged.at("/data/suppressed/0/campaignId").asText()).isEqualTo("vip-only");
         assertThat(logged.at("/data/suppressed/0/reasonCode").asText()).isEqualTo("RULE_NOT_MET");
         assertThat(logged.at("/data/strategy").asText()).contains("eligibility-rules").doesNotContain("thompson");
+    }
+
+    @Test
+    void explainsSuppressedCandidatesOnRequest() throws Exception {
+        String body = """
+                {"relatedParty":[{"id":"party-42"}],"channel":{"id":"web"},
+                 "characteristic":[{"name":"tenureMonths","value":24}],"maxItems":1}
+                """;
+        mvc.perform(post(BASE).param("explain", "true").header("X-Tenant-Id", "acme")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.recommendationItem.length()").value(1))
+                .andExpect(jsonPath("$.suppressedItem[?(@.reasonCode == 'RULE_NOT_EVALUABLE')].promotion.id")
+                        .value("vip-only"))
+                .andExpect(jsonPath("$.suppressedItem[?(@.reasonCode == 'RULE_NOT_EVALUABLE')].stage")
+                        .value("eligibility-rules"))
+                .andExpect(jsonPath("$.suppressedItem[?(@.reasonCode == 'RANKED_OUT')].productOffering.id")
+                        .value("addon"));
     }
 
     @Test

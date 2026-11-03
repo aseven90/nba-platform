@@ -79,9 +79,11 @@ spec:
       labels:
         {{- include "nba-common.labels" . | nindent 8 }}
       annotations:
+        {{- if ne (.Values.metrics | default dict).enabled false }}
         prometheus.io/scrape: "true"
         prometheus.io/path: /actuator/prometheus
         prometheus.io/port: {{ .Values.containerPort | quote }}
+        {{- end }}
         {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -163,10 +165,19 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            {{- range .Values.writablePaths }}
+            - name: {{ .name }}
+              mountPath: {{ .path }}
+            {{- end }}
       volumes:
         - name: tmp
           emptyDir:
             sizeLimit: 256Mi
+        {{- range .Values.writablePaths }}
+        - name: {{ .name }}
+          emptyDir:
+            sizeLimit: 16Mi
+        {{- end }}
 {{- end -}}
 
 {{- define "nba-common.hpa" -}}
@@ -241,7 +252,7 @@ spec:
     - host: {{ .Values.ingress.host | quote }}
       http:
         paths:
-          - path: /tmf-api
+          - path: {{ .Values.ingress.path | default "/tmf-api" }}
             pathType: Prefix
             backend:
               service:
@@ -261,7 +272,7 @@ spec:
   {{- with .Values.openshift.route.host }}
   host: {{ . }}
   {{- end }}
-  path: /tmf-api
+  path: {{ .Values.openshift.route.path | default "/tmf-api" }}
   to:
     kind: Service
     name: {{ include "nba-common.fullname" . }}
