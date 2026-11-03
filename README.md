@@ -61,6 +61,7 @@ see `services/decision-service/decision-spi`.
 | `services/campaign-service` | TMF671 Promotion (campaigns) |
 | `services/decision-service` | `decision-spi`, `decision-plugins-core`, `decision-app` (TMF680 Recommendation) |
 | `services/interaction-service` | TMF683 PartyInteraction (impressions and responses, idempotent) |
+| `ui/console` | Web console (React + TypeScript) for managing actions and campaigns and trying decisions |
 | `deploy` | Docker Compose, Helm charts with kind/EKS/OpenShift overlays, Kafka topics |
 
 ## Run it locally
@@ -71,7 +72,28 @@ Requires Docker.
 docker compose -f deploy/compose/docker-compose.yml up --build
 ```
 
-Then create an action and a campaign, ask for a decision and report the response:
+Open the console at http://localhost:3000, click **Load demo data** on the Overview page, then go to the
+**Decision playground**. Change the customer attributes (for example `tenureMonths`, `optOut = true`,
+`consent.web = false`) and run a decision to see the ranked actions, the scores behind them, and which
+candidates were dropped and why. Record Shown, Accepted or Declined on a result and it appears under
+**Interactions**. The tenant switch in the sidebar keeps test data apart.
+
+### Console development
+
+```bash
+cd ui/console
+npm ci
+npm run dev        # http://localhost:5173, proxies the TMF APIs to the services on 8081-8084
+npm run lint && npm run typecheck && npm test
+npm run e2e        # browser tests against a mocked API (Playwright)
+```
+
+Set `CATALOG_URL`, `CAMPAIGN_URL`, `DECISION_URL` or `INTERACTION_URL` to point the dev proxy elsewhere.
+In containers the console is served by nginx, which proxies the same paths to the services.
+
+### Without the console
+
+Create an action and a campaign, ask for a decision and report the response:
 
 ```bash
 T='X-Tenant-Id: demo'; J='Content-Type: application/json'

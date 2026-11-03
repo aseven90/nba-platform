@@ -28,6 +28,33 @@ jobs:
           name: surefire-reports
           path: "**/target/surefire-reports/"
 
+  console:
+    name: Console
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui/console
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/console/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - name: Browser tests
+        run: npm run e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: ui/console/playwright-report/
+
   helm:
     name: Lint Helm charts
     runs-on: ubuntu-latest
@@ -39,7 +66,7 @@ jobs:
       - name: Lint and render every chart for every target
         run: |
           set -euo pipefail
-          for chart in action-catalog-service campaign-service decision-service interaction-service; do
+          for chart in action-catalog-service campaign-service decision-service interaction-service console; do
             helm dependency build deploy/helm/$chart
             helm lint deploy/helm/$chart
             for env in kind eks openshift; do
@@ -49,7 +76,7 @@ jobs:
 
   images:
     name: Image ${{ matrix.service.name }}
-    needs: build
+    needs: [build, console]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -58,10 +85,11 @@ jobs:
       fail-fast: false
       matrix:
         service:
-          - { name: action-catalog-service, module: services/action-catalog-service }
-          - { name: campaign-service, module: services/campaign-service }
-          - { name: decision-service, module: services/decision-service/decision-app }
-          - { name: interaction-service, module: services/interaction-service }
+          - { name: action-catalog-service, context: ., module: services/action-catalog-service }
+          - { name: campaign-service, context: ., module: services/campaign-service }
+          - { name: decision-service, context: ., module: services/decision-service/decision-app }
+          - { name: interaction-service, context: ., module: services/interaction-service }
+          - { name: console, context: ui/console, module: "" }
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -75,7 +103,7 @@ jobs:
       - name: Build (and push on main)
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ${{ matrix.service.context }}
           build-args: MODULE=${{ matrix.service.module }}
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           tags: |

@@ -1,4 +1,4 @@
-# Local stack: PostgreSQL, a Kafka-API broker (Redpanda) and the four services.
+# Local stack: PostgreSQL, a Kafka-API broker (Redpanda), the four services and the console (http://localhost:3000).
 #   docker compose -f deploy/compose/docker-compose.yml up --build
 name: nba-platform
 
@@ -85,3 +85,18 @@ services:
       <<: *env
       DB_URL: jdbc:postgresql://postgres:5432/interaction
     ports: ["8084:8080"]
+
+  console:
+    build: { context: ../../ui/console }
+    restart: unless-stopped
+    depends_on:
+      - action-catalog-service
+      - campaign-service
+      - decision-service
+      - interaction-service
+    environment:
+      CATALOG_URL: http://action-catalog-service:8080
+      CAMPAIGN_URL: http://campaign-service:8080
+      DECISION_URL: http://decision-service:8080
+      INTERACTION_URL: http://interaction-service:8080
+    ports: ["3000:8080"]
