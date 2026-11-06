@@ -6,7 +6,7 @@ nba:
   decision:
     deadline: 500ms
     safe-defaults:
-      acme: [safe-1]
+      acme: [safe-1, safe-retired, safe-sms, safe-not-yet-loaded]
     plugins:
       thompson-sampling:
         enabled: false

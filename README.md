@@ -36,18 +36,22 @@ The decision service runs a pipeline of **plugins** (in-process, swappable, each
 |---|---|---|
 | Candidates | `campaign-candidates` | Actions of every active campaign valid now on the request channel |
 | Eligibility | `consent`, `eligibility-rules`, `contact-policy`, `control-group` | Opt-out and channel consent, [campaign rules](docs/eligibility-rules.md), daily impression caps, stable hold-out groups for lift measurement |
-| Scoring | `logistic-propensity` | Per-offering logistic propensity model over context attributes |
+| Scoring | `propensity-scoring` with scorers `logistic`, `remote` | Each offering's propensity model, routed to a scorer plugin: in-process logistic regression, or a Python-served model on a model server ([scoring](docs/scoring.md)) |
 | Learning | `thompson-sampling` | Contextual Thompson sampling: Beta posterior per campaign x offering, prior centred on the model score |
 | Arbitration | `priority-pvl` | priority = propensity x value x business lever |
 | Selection | `top-n` | Best campaign per offering, top N |
 
-The pipeline runs under a deadline (80 ms default), a per-channel bulkhead and a circuit breaker. If it fails,
-times out or the breaker is open, the API still answers with the tenant's configured **safe default** actions and
-`fallback: true`. Every decision, including each suppressed candidate and its reason code, is written to the
-`nba.decision.made` log.
+The pipeline runs under a deadline (80 ms default), a per-channel bulkhead and a circuit breaker. Failures degrade
+in two levels: a model that fails, times out or returns nonsense is replaced by the default prior **for that action
+only** (`SCORING_FALLBACK`), and rules, consent and contact policy still apply. If the whole pipeline fails, times
+out or the breaker is open, the API answers with the tenant's configured **safe default** actions, `fallback: true`
+and a `fallbackReason`; safe defaults still honour opt-out and channel consent. Every decision, including each
+suppressed candidate and its reason code and each item's explanation (model, top feature contributions,
+propensity x value x lever), is written to the `nba.decision.made` log. `?explain=true` returns the same
+explanation on the API.
 
-Adding a strategy (uplift model, RL policy, remote model server) means shipping a jar with a `DecisionStage` bean;
-see `services/decision-service/decision-spi`.
+Adding a strategy (uplift model, RL policy) means shipping a jar with a `DecisionStage` bean; a new kind of
+propensity model is a `PropensityScorer` bean. See `services/decision-service/decision-spi`.
 
 ## Repository layout
 

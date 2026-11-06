@@ -30,18 +30,24 @@ public class ConsentStage implements DecisionStage {
 
     @Override
     public void apply(DecisionContext context) {
-        Map<String, Object> attributes = context.request().attributes();
-        String reason;
-        if (isTrue(attributes.get("optOut"))) {
-            reason = "OPTED_OUT";
-        } else {
-            Object consent = attributes.get("consent." + context.request().channel());
-            boolean denied = consent == null ? requireExplicitConsent : !isTrue(consent);
-            reason = denied ? "NO_CHANNEL_CONSENT" : null;
-        }
+        String reason = denialReason(context.request().attributes(), context.request().channel(),
+                requireExplicitConsent);
         if (reason != null) {
             context.suppressIf(c -> reason);
         }
+    }
+
+    /**
+     * Returns {@code OPTED_OUT} or {@code NO_CHANNEL_CONSENT} when nothing may be shown to the party on the
+     * channel, otherwise null. Also used by the safe default answer, which must respect consent too.
+     */
+    public static String denialReason(Map<String, Object> attributes, String channel, boolean requireExplicitConsent) {
+        if (isTrue(attributes.get("optOut"))) {
+            return "OPTED_OUT";
+        }
+        Object consent = attributes.get("consent." + channel);
+        boolean denied = consent == null ? requireExplicitConsent : !isTrue(consent);
+        return denied ? "NO_CHANNEL_CONSENT" : null;
     }
 
     private static boolean isTrue(Object value) {

@@ -1,6 +1,6 @@
 import { useMemo, useState, type FormEvent } from 'react';
 import { campaignApi, decisionApi, interactionApi } from '../api/endpoints';
-import type { Outcome, Recommendation, RecommendationItem } from '../api/types';
+import type { Explanation, Outcome, Recommendation, RecommendationItem } from '../api/types';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { Chip, Empty, ErrorBanner, Field, Notice, PageHeader } from '../components/ui';
 import { attributesInRule, toCharacteristics, type KeyValueRow } from '../lib/forms';
@@ -15,6 +15,52 @@ const OUTCOMES: { outcome: Outcome; label: string }[] = [
 ];
 
 const format = (n?: number, digits = 3) => (n === undefined ? '–' : n.toFixed(digits));
+
+/** How the item's priority was built: the model behind the propensity, then propensity × value × lever. */
+function WhyThisScore({ explanation: e }: { explanation: Explanation }) {
+  const model = e.scoringFallback
+    ? `default prior (${describeReason(e.scoringFallback)})`
+    : e.scorer === 'prior'
+      ? 'default prior (no model on this action)'
+      : `${e.scorer} model ${[e.modelName, e.modelVersion].filter(Boolean).join(' ')}`;
+  return (
+    <details className="why">
+      <summary>Why this score</summary>
+      <p className="small">
+        Propensity from <span className="strong">{model}</span>: {format(e.modelPropensity)}
+        {Math.abs(e.propensity - e.modelPropensity) > 1e-9 && <>, adjusted by learning to {format(e.propensity)}</>}.
+      </p>
+      <p className="small mono">
+        priority = {format(e.propensity)} × value {format(e.value, 2)} × lever {format(e.priorityLever, 2)} ={' '}
+        {format(e.priority, 2)}
+      </p>
+      {e.contributions.length > 0 && (
+        <table className="small contributions">
+          <thead>
+            <tr>
+              <th>Feature</th>
+              <th className="num">Value</th>
+              <th className="num">Weight</th>
+              <th className="num">Effect</th>
+            </tr>
+          </thead>
+          <tbody>
+            {e.contributions.map((c) => (
+              <tr key={c.feature}>
+                <td className="mono">{c.feature}</td>
+                <td className="num mono">{format(c.value, 2)}</td>
+                <td className="num mono">{format(c.weight)}</td>
+                <td className="num mono">
+                  {c.contribution === undefined ? '–' : `${c.contribution >= 0 ? '+' : ''}${format(c.contribution)}`}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </details>
+  );
+}
 
 export function PlaygroundPage() {
   const { tenant } = useTenant();
@@ -156,7 +202,8 @@ export function PlaygroundPage() {
               {result.fallback && (
                 <Notice tone="warning">
                   The decision service could not run its normal pipeline and returned the configured safe default
-                  actions. The reason codes below say why.
+                  actions{result.fallbackReason ? ` (${describeReason(result.fallbackReason)})` : ''}. Safe defaults
+                  still respect opt-out and channel consent.
                 </Notice>
               )}
 
@@ -190,6 +237,7 @@ export function PlaygroundPage() {
                             </div>
                           </dl>
                         )}
+                        {!result.fallback && item.explanation && <WhyThisScore explanation={item.explanation} />}
                         <div className="chips">
                           {item.reasonCode.map((code) => (
                             <Chip key={code} title={describeReason(code)}>

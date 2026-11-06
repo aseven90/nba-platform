@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { catalogApi } from '../api/endpoints';
-import type { ProductOffering } from '../api/types';
+import type { ProductOffering, PropensityModel } from '../api/types';
 import { KeyValueEditor } from '../components/KeyValueEditor';
 import { Empty, ErrorBanner, Field, PageHeader, StatusBadge } from '../components/ui';
 import { fromChannelRefs, fromRecord, toChannelRefs, toCoefficients, type KeyValueRow } from '../lib/forms';
@@ -21,6 +21,8 @@ interface Draft {
   modelVersion: string;
   intercept: string;
   coefficients: KeyValueRow[];
+  /** The model as loaded, so saving keeps fields the form does not show. */
+  model?: PropensityModel;
 }
 
 const EMPTY: Draft = {
@@ -49,6 +51,7 @@ function toDraft(o: ProductOffering): Draft {
     modelVersion: o.propensityModel?.version ?? 'v1',
     intercept: String(o.propensityModel?.intercept ?? -2),
     coefficients: fromRecord(o.propensityModel?.coefficients),
+    model: o.propensityModel ?? undefined,
   };
 }
 
@@ -75,7 +78,13 @@ export function ActionsPage() {
       channel: toChannelRefs(draft.channels),
       businessValue: Number(draft.businessValue) || 0,
       propensityModel: draft.modelEnabled
-        ? { version: draft.modelVersion.trim() || undefined, intercept: Number(draft.intercept) || 0, coefficients }
+        ? {
+            // Keep fields this form does not edit (for example a remote model's name and features).
+            ...draft.model,
+            version: draft.modelVersion.trim() || undefined,
+            intercept: Number(draft.intercept) || 0,
+            coefficients,
+          }
         : null,
     };
     setSaving(true);
@@ -240,7 +249,9 @@ export function ActionsPage() {
                   <td>
                     {o.propensityModel ? (
                       <span className="mono small">
-                        {o.propensityModel.version} · {Object.keys(o.propensityModel.coefficients ?? {}).length} features
+                        {o.propensityModel.type === 'remote'
+                          ? `remote · ${o.propensityModel.name ?? '?'}${o.propensityModel.version ? ` ${o.propensityModel.version}` : ''}`
+                          : `${o.propensityModel.version} · ${Object.keys(o.propensityModel.coefficients ?? {}).length} features`}
                       </span>
                     ) : (
                       <span className="muted">default</span>

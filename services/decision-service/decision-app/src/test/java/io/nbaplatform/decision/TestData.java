@@ -27,6 +27,10 @@ final class TestData {
         store.apply("acme", offering("upgrade", 100, -3));   // low propensity, high value
         store.apply("acme", offering("addon", 20, -1));      // higher propensity, lower value
         store.apply("acme", offering("safe-1", 0, 0));
+        store.apply("acme", new OfferingChanged("safe-retired", "Retired", null, null, "Retired", List.of(), 0, null,
+                null, false, 1));
+        store.apply("acme", new OfferingChanged("safe-sms", "SMS only", null, null, "Active", List.of("sms"), 0, null,
+                null, false, 1));
         store.apply("acme", campaign("growth", "tenureMonths >= 12",
                 new CampaignAction("upgrade", 1.0), new CampaignAction("addon", 1.0)));
         store.apply("acme", campaign("vip-only", "segment == 'vip'", new CampaignAction("addon", 2.0)));

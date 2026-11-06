@@ -17,8 +17,13 @@ import io.nbaplatform.decision.spi.DecisionRequest;
 import io.nbaplatform.decision.spi.DecisionSnapshot;
 import io.nbaplatform.decision.spi.FeatureProvider;
 import io.nbaplatform.decision.spi.LearningState;
+import io.nbaplatform.decision.spi.ScoringFailedException;
+import io.nbaplatform.decision.spi.Suppression;
+import io.nbaplatform.decision.plugins.ConsentStage;
+import io.nbaplatform.decision.plugins.Lifecycle;
 import io.nbaplatform.events.OfferingChanged;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,12 +35,18 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
  * Runs the decision pipeline under the resilience quartet: a per-request deadline (timeout), a per-channel
  * bulkhead, and a circuit breaker. No retries on this path: the deadline is too short for them to help.
  * Whenever a decision cannot be made, the configured safe default answer is returned instead of an error.
+ *
+ * <p>The safe default is still a decision about a person, so it keeps the guarantees that do not depend on the
+ * failed pipeline: a party who opted out or withdrew channel consent gets nothing, and configured offerings
+ * that are known to be retired, expired or not offered on the channel are skipped. Offerings the snapshot does
+ * not know yet (for example right after start-up) are still returned, because an operator listed them.
  */
 @Service
 public class DecisionEngine {
@@ -52,10 +63,13 @@ public class DecisionEngine {
     private final BulkheadRegistry bulkheads;
     private final CircuitBreaker circuitBreaker;
     private final MeterRegistry meters;
+    private final boolean requireExplicitConsent;
 
     public DecisionEngine(DecisionPipeline pipeline, DecisionSnapshot snapshot, LearningState learning,
                           ContactHistory contactHistory, FeatureProvider features, ExecutorService decisionExecutor,
-                          DecisionProperties properties, MeterRegistry meters) {
+                          DecisionProperties properties, MeterRegistry meters,
+                          @Value("${nba.decision.plugins.consent.require-explicit:false}") boolean requireExplicitConsent) {
+        this.requireExplicitConsent = requireExplicitConsent;
         this.pipeline = pipeline;
         this.snapshot = snapshot;
         this.learning = learning;
@@ -116,7 +130,8 @@ public class DecisionEngine {
             } catch (ExecutionException e) {
                 circuitBreaker.onError(System.nanoTime() - start, TimeUnit.NANOSECONDS, e.getCause());
                 log.warn("Decision pipeline failed for tenant {}: {}", request.tenantId(), e.getCause().toString());
-                return fallback(decisionId, request, "PIPELINE_ERROR", start);
+                String reason = e.getCause() instanceof ScoringFailedException ? "SCORING_FAILED" : "PIPELINE_ERROR";
+                return fallback(decisionId, request, reason, start);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 future.cancel(true);
@@ -140,18 +155,40 @@ public class DecisionEngine {
 
     private DecisionOutcome fallback(String decisionId, DecisionRequest request, String reason, long start) {
         meters.counter("nba.decision.fallback", "reason", reason).increment();
-        List<Candidate> items = properties.safeDefaultsFor(request.tenantId()).stream()
-                .limit(request.maxItems())
-                .map(id -> {
-                    OfferingChanged offering = snapshot.offering(request.tenantId(), id)
-                            .orElse(new OfferingChanged(id, null, null, null, null, List.of(), 0, null, null, false, 0));
-                    Candidate c = new Candidate(offering, null, 1.0);
-                    c.reason("SAFE_DEFAULT");
-                    c.reason(reason);
-                    return c;
-                })
-                .toList();
-        return new DecisionOutcome(decisionId, request, items, List.of(), reason, micros(start));
+        List<Candidate> items = new ArrayList<>();
+        List<Suppression> suppressed = new ArrayList<>();
+        String denied = ConsentStage.denialReason(request.attributes(), request.channel(), requireExplicitConsent);
+        for (String id : properties.safeDefaultsFor(request.tenantId())) {
+            var known = snapshot.offering(request.tenantId(), id);
+            OfferingChanged offering = known
+                    .orElse(new OfferingChanged(id, null, null, null, null, List.of(), 0, null, null, false, 0));
+            Candidate c = new Candidate(offering, null, 1.0);
+            String skip = denied != null ? denied : known.map(o -> unusable(o, request)).orElse(null);
+            if (skip != null) {
+                suppressed.add(new Suppression(c, "safe-default", skip));
+            } else if (items.size() >= request.maxItems()) {
+                suppressed.add(new Suppression(c, "safe-default", "RANKED_OUT"));
+            } else {
+                c.reason("SAFE_DEFAULT");
+                c.reason(reason);
+                items.add(c);
+            }
+        }
+        return new DecisionOutcome(decisionId, request, List.copyOf(items), List.copyOf(suppressed), reason,
+                micros(start));
+    }
+
+    /** Why a known offering cannot be a safe default on this request, or null if it can. */
+    private static String unusable(OfferingChanged offering, DecisionRequest request) {
+        if (!Lifecycle.offeringLive(offering.lifecycleStatus())
+                || (offering.validFor() != null && !offering.validFor().includes(request.now()))) {
+            return "OFFERING_NOT_LIVE";
+        }
+        List<String> channels = offering.channels();
+        if (channels != null && !channels.isEmpty() && !channels.contains(request.channel())) {
+            return "OFFERING_CHANNEL_MISMATCH";
+        }
+        return null;
     }
 
     private static long micros(long start) {

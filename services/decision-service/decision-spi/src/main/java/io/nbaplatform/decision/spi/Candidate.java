@@ -16,6 +16,8 @@ public final class Candidate {
     private double modelPropensity;
     private double propensity;
     private double priority;
+    private double value = Double.NaN;
+    private ScoringExplanation scoring;
 
     public Candidate(OfferingChanged offering, CampaignChanged campaign, double priorityLever) {
         this.offering = offering;
@@ -60,6 +62,24 @@ public final class Candidate {
 
     public void priority(double value) {
         this.priority = value;
+    }
+
+    /** Business value the arbitration stage used, or NaN before arbitration. */
+    public double value() {
+        return value;
+    }
+
+    public void value(double value) {
+        this.value = value;
+    }
+
+    /** How the scoring stage arrived at {@link #modelPropensity()}, or null before scoring. */
+    public ScoringExplanation scoring() {
+        return scoring;
+    }
+
+    public void scoring(ScoringExplanation scoring) {
+        this.scoring = scoring;
     }
 
     public void reason(String code) {

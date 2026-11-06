@@ -84,9 +84,11 @@ class CoreStagesTest {
     @Test
     void logisticModelScoresNumericFeatures() {
         PropensityModel model = new PropensityModel("v1", -1.0, Map.of("tenureMonths", 0.1, "isGold", 1.0));
-        assertThat(LogisticPropensityStage.score(model, Map.of("tenureMonths", 10, "isGold", true)))
+        LogisticScorer scorer = new LogisticScorer();
+        assertThat(scorer.score(model, Fixtures.request(Map.of("tenureMonths", 10, "isGold", true))).propensity())
                 .isCloseTo(1 / (1 + Math.exp(-1.0)), within(1e-9));
-        assertThat(LogisticPropensityStage.score(model, Map.of())).isCloseTo(1 / (1 + Math.exp(1.0)), within(1e-9));
+        assertThat(scorer.score(model, Fixtures.request(Map.of())).propensity())
+                .isCloseTo(1 / (1 + Math.exp(1.0)), within(1e-9));
     }
 
     @Test
@@ -101,7 +103,7 @@ class CoreStagesTest {
         double sum = 0;
         for (int i = 0; i < 200; i++) {
             DecisionContext ctx = f.context("p1", Map.of(), 1);
-            Fixtures.run(ctx, new CampaignCandidateStage(), new LogisticPropensityStage(0.05), stage);
+            Fixtures.run(ctx, new CampaignCandidateStage(), Fixtures.scoring(), stage);
             sum += ctx.candidates().get(0).propensity();
         }
         assertThat(sum / 200).isCloseTo(0.30, within(0.01));
@@ -128,7 +130,7 @@ class CoreStagesTest {
                 .with(campaign("c2", null, 0, 0, new CampaignAction("cheap", 3)));
         DecisionContext ctx = f.context("p1", Map.of(), 2);
 
-        Fixtures.run(ctx, new CampaignCandidateStage(), new LogisticPropensityStage(0.05),
+        Fixtures.run(ctx, new CampaignCandidateStage(), Fixtures.scoring(),
                 new PriorityArbitrationStage(), new TopNSelectionStage());
 
         // cheap via c2: 0.5 * 10 * 3 = 15; premium: 11.9; cheap via c1: 5; service: 0.95

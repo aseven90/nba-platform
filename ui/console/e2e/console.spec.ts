@@ -26,6 +26,12 @@ test('load demo data, then decide and record a response', async ({ page }) => {
   await expect(ranked.first()).toContainText('via Grow loyal customers');
   await expect(page.getByText('The campaign eligibility rule evaluated to false.')).toBeVisible();
 
+  await ranked.first().getByText('Why this score').click();
+  await expect(ranked.first()).toContainText('logistic model v1');
+  await expect(ranked.first()).toContainText('priority = 0.118 × value 120.00 × lever 1.00 = 14.21');
+  await expect(ranked.first().getByRole('cell', { name: 'tenureMonths' })).toBeVisible();
+  await expect(ranked.first().getByRole('cell', { name: '+1.200' })).toBeVisible();
+
   await ranked.first().getByRole('button', { name: 'Accepted' }).click();
   await expect(ranked.first().getByRole('button', { name: '✓ Accepted' })).toBeDisabled();
   expect(api.interactionKeys).toEqual(['decision-123:offer-1:ACCEPTED']);
@@ -71,7 +77,25 @@ test('shows the safe default answer clearly', async ({ page }) => {
   await page.goto('/playground');
   await page.getByRole('button', { name: 'Get next best actions' }).click();
   await expect(page.getByText('safe default', { exact: true })).toBeVisible();
-  await expect(page.getByText('The decision took longer than its deadline.')).toBeVisible();
+  await expect(page.getByText('The decision took longer than its deadline.').first()).toBeVisible();
+  await expect(page.getByText(/still respect opt-out and channel consent/)).toBeVisible();
+});
+
+test('editing a remote-model action keeps its model server settings', async ({ page }) => {
+  const api = new FakeApi();
+  api.offerings = [{
+    id: 'o-r', name: 'Retention call', lifecycleStatus: 'Active', businessValue: 50,
+    propensityModel: { type: 'remote', name: 'churn', version: '3', intercept: 0, coefficients: {}, features: ['tenureMonths'] },
+  }];
+  await api.install(page);
+  await page.goto('/actions');
+  await expect(page.getByText('remote · churn 3')).toBeVisible();
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const form = page.getByRole('form', { name: 'Action form' });
+  await form.getByLabel('Business value').fill('60');
+  await form.getByRole('button', { name: 'Save action' }).click();
+  await expect(page.getByRole('cell', { name: '60' })).toBeVisible();
+  expect(api.offerings[0].propensityModel).toMatchObject({ type: 'remote', name: 'churn', features: ['tenureMonths'] });
 });
 
 test('switching tenant sends the new tenant id', async ({ page }) => {

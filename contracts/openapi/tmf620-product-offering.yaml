@@ -78,11 +78,17 @@ components:
   schemas:
     PropensityModel:
       type: object
-      description: Logistic model, p = sigmoid(intercept + sum(coefficients[f] * attribute[f]))
+      description: >
+        Propensity model for the offering. type logistic (default) is evaluated in-process as
+        p = sigmoid(intercept + sum(coefficients[f] * attribute[f])). type remote is served by an external model
+        server (Open Inference Protocol v2) under name, with inputs taken from the attributes listed in features.
       properties:
+        type: { type: string, enum: [logistic, remote], default: logistic }
+        name: { type: string, description: Model name on the model server (remote only) }
         version: { type: string }
         intercept: { type: number }
         coefficients: { type: object, additionalProperties: { type: number } }
+        features: { type: array, items: { type: string }, description: Ordered model inputs (remote only) }
     ProductOffering_Update:
       type: object
       properties:
