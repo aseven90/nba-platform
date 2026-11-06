@@ -25,6 +25,7 @@ public class PriorityArbitrationStage implements DecisionStage {
     public void apply(DecisionContext context) {
         for (Candidate c : context.candidates()) {
             double value = c.offering().businessValue() > 0 ? c.offering().businessValue() : 1.0;
+            c.value(value);
             c.priority(c.propensity() * value * c.priorityLever());
         }
     }

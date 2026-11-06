@@ -6,6 +6,7 @@ import io.nbaplatform.decision.engine.DecisionOutcome;
 import io.nbaplatform.decision.engine.DecisionProperties;
 import io.nbaplatform.decision.spi.Candidate;
 import io.nbaplatform.decision.spi.DecisionRequest;
+import io.nbaplatform.decision.spi.ScoringExplanation;
 import io.nbaplatform.events.ValidFor;
 import io.nbaplatform.platform.tenant.TenantContext;
 import jakarta.validation.Valid;
@@ -65,6 +66,25 @@ public class RecommendationController {
         return toResource(outcome, explain);
     }
 
+    /** Contributions returned per item, biggest effect first. */
+    static final int EXPLAINED_CONTRIBUTIONS = 5;
+
+    private static Recommendation.Explanation explanation(Candidate c) {
+        ScoringExplanation scoring = c.scoring();
+        List<Recommendation.Contribution> contributions = scoring == null ? List.of() : scoring.contributions().stream()
+                .limit(EXPLAINED_CONTRIBUTIONS)
+                .map(f -> new Recommendation.Contribution(f.feature(), f.value(), f.weight(), f.contribution()))
+                .toList();
+        return new Recommendation.Explanation(
+                scoring == null ? null : scoring.scorer(),
+                scoring == null ? null : scoring.modelName(),
+                scoring == null ? null : scoring.modelVersion(),
+                c.modelPropensity(), c.propensity(), Double.isNaN(c.value()) ? c.offering().businessValue() : c.value(),
+                c.priorityLever(), c.priority(),
+                scoring == null ? null : scoring.fallbackReason(),
+                contributions);
+    }
+
     private static Recommendation toResource(DecisionOutcome outcome, boolean explain) {
         List<Recommendation.RecommendationItem> items = new ArrayList<>();
         for (int i = 0; i < outcome.items().size(); i++) {
@@ -78,6 +98,7 @@ public class RecommendationController {
                     outcome.fallback() ? null : c.priority(),
                     outcome.fallback() ? null : c.propensity(),
                     c.reasonCodes(),
+                    explain && !outcome.fallback() ? explanation(c) : null,
                     "NbaRecommendationItem"));
         }
         List<Recommendation.SuppressedItem> suppressed = !explain ? null : outcome.suppressed().stream()
@@ -100,6 +121,7 @@ public class RecommendationController {
                 items,
                 suppressed,
                 outcome.fallback(),
+                outcome.fallbackReason(),
                 "NbaRecommendation",
                 "Recommendation");
     }

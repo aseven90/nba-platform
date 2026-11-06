@@ -73,10 +73,16 @@ components:
         validFor: { $ref: '#/components/schemas/ValidFor' }
         propensityModel:
           type: object
+          description: >
+            type selects the scorer plugin: logistic (default, evaluated in-process from intercept and
+            coefficients) or remote (served by an external model server under name, with inputs in features order).
           properties:
+            type: { type: string, enum: [logistic, remote], default: logistic }
+            name: { type: string, description: Model name on the model server (remote only) }
             version: { type: string }
             intercept: { type: number }
             coefficients: { type: object, additionalProperties: { type: number } }
+            features: { type: array, items: { type: string }, description: Ordered model inputs (remote only) }
         deleted: { type: boolean }
         version: { type: integer }
     CampaignChangedData:
@@ -121,6 +127,7 @@ components:
               propensity: { type: number }
               businessValue: { type: number }
               reasonCodes: { type: array, items: { type: string } }
+              explanation: { $ref: '#/components/schemas/DecisionExplanation' }
         suppressed:
           type: array
           items:
@@ -129,6 +136,33 @@ components:
               offeringId: { type: string }
               campaignId: { type: string }
               reasonCode: { type: string }
+    DecisionExplanation:
+      type: object
+      description: >
+        Why an item got its priority. Raw attribute values are left out of the log on purpose (privacy by design);
+        the API returns them only when the caller asks for ?explain=true.
+      properties:
+        scorer: { type: string, description: 'Scorer plugin type: logistic, remote, prior' }
+        modelName: { type: string }
+        modelVersion: { type: string }
+        modelPropensity: { type: number, description: Propensity from the model, before learning adjusted it }
+        propensity: { type: number, description: Propensity used for arbitration }
+        value: { type: number, description: Business value used for arbitration (1 for non-monetary actions) }
+        priorityLever: { type: number }
+        priority: { type: number }
+        scoringFallback:
+          type: string
+          description: Set when the model could not be used and the default prior was applied instead
+          enum: [SCORER_UNAVAILABLE, SCORING_ERROR, SCORING_TIMEOUT, SCORING_INVALID_OUTPUT, CIRCUIT_OPEN]
+        contributions:
+          type: array
+          description: Largest feature contributions to the model score (logistic models)
+          items:
+            type: object
+            properties:
+              feature: { type: string }
+              weight: { type: number }
+              contribution: { type: number }
     InteractionRecordedData:
       type: object
       properties:

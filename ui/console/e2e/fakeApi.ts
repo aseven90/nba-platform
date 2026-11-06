@@ -87,7 +87,15 @@ export class FakeApi {
     const items = this.fallback
       ? [{ id: '1', priority: 1, productOffering: ref(third), reasonCode: ['SAFE_DEFAULT', 'DEADLINE_EXCEEDED'] }]
       : [
-          { id: '1', priority: 1, productOffering: ref(first), promotion: ref(growth), score: 14.21, propensity: 0.118, reasonCode: ['MODEL_v1', 'EXPLORING_NEW_ARM'] },
+          {
+            id: '1', priority: 1, productOffering: ref(first), promotion: ref(growth), score: 14.21, propensity: 0.118,
+            reasonCode: ['MODEL_v1', 'EXPLORING_NEW_ARM'],
+            explanation: explain ? {
+              scorer: 'logistic', modelVersion: 'v1', modelPropensity: 0.105, propensity: 0.118, value: 120,
+              priorityLever: 1, priority: 14.21,
+              contributions: [{ feature: 'tenureMonths', value: 24, weight: 0.05, contribution: 1.2 }],
+            } : undefined,
+          },
           { id: '2', priority: 2, productOffering: ref(second), promotion: ref(growth), score: 11.4, propensity: 0.237, reasonCode: ['MODEL_v1', 'POSTERIOR_SAMPLED'] },
         ];
     return {
@@ -100,6 +108,7 @@ export class FakeApi {
         ? [{ productOffering: ref(third), promotion: ref(onboarding), stage: 'eligibility-rules', reasonCode: 'RULE_NOT_MET' }]
         : explain ? [] : undefined,
       fallback: this.fallback,
+      fallbackReason: this.fallback ? 'DEADLINE_EXCEEDED' : undefined,
     };
   }
 }

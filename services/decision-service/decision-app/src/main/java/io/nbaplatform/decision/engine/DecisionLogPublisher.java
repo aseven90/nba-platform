@@ -3,6 +3,7 @@ package io.nbaplatform.decision.engine;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.nbaplatform.decision.spi.Candidate;
+import io.nbaplatform.decision.spi.ScoringExplanation;
 import io.nbaplatform.events.DecisionMade;
 import io.nbaplatform.events.EventEnvelope;
 import io.nbaplatform.events.EventTypes;
@@ -49,13 +50,33 @@ public class DecisionLogPublisher {
         sender.awaitTermination(5, TimeUnit.SECONDS);
     }
 
+    /** Logged contributions per item; enough to audit a decision without bloating the log. */
+    static final int LOGGED_CONTRIBUTIONS = 5;
+
+    static DecisionMade.Explanation explanation(Candidate c) {
+        ScoringExplanation scoring = c.scoring();
+        List<DecisionMade.Contribution> contributions = scoring == null ? List.of() : scoring.contributions().stream()
+                .limit(LOGGED_CONTRIBUTIONS)
+                .map(f -> new DecisionMade.Contribution(f.feature(), f.weight(), f.contribution()))
+                .toList();
+        return new DecisionMade.Explanation(
+                scoring == null ? null : scoring.scorer(),
+                scoring == null ? null : scoring.modelName(),
+                scoring == null ? null : scoring.modelVersion(),
+                c.modelPropensity(), c.propensity(), Double.isNaN(c.value()) ? c.offering().businessValue() : c.value(),
+                c.priorityLever(), c.priority(),
+                scoring == null ? null : scoring.fallbackReason(),
+                contributions);
+    }
+
     public void publish(DecisionOutcome outcome, String strategy) {
         var request = outcome.request();
         List<DecisionMade.Item> items = new ArrayList<>();
         for (int i = 0; i < outcome.items().size(); i++) {
             Candidate c = outcome.items().get(i);
             items.add(new DecisionMade.Item(i + 1, c.offering().id(), c.campaign() == null ? null : c.campaign().id(),
-                    c.priority(), c.propensity(), c.offering().businessValue(), c.reasonCodes()));
+                    c.priority(), c.propensity(), c.offering().businessValue(), c.reasonCodes(),
+                    outcome.fallback() ? null : explanation(c)));
         }
         List<DecisionMade.Suppression> suppressed = outcome.suppressed().stream()
                 .map(s -> new DecisionMade.Suppression(s.candidate().offering().id(),

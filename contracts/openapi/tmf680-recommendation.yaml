@@ -3,9 +3,14 @@ info:
   title: Decisions (TMF680 Recommendation Management)
   version: 0.1.0
   description: |
-    Real-time next best action decisions. The response always succeeds when the request is valid: if the
-    decision pipeline fails or misses its deadline, the configured safe default actions are returned with
-    fallback=true.
+    Real-time next best action decisions. The response always succeeds when the request is valid. Failures
+    degrade in two levels:
+      1. A propensity model that fails, times out or returns an invalid score is replaced by the default prior
+         for that item only; rules, consent and contact policy still apply. The item carries the reason code
+         SCORING_FALLBACK and explanation.scoringFallback says why.
+      2. If the whole pipeline fails or misses its deadline, the configured safe default actions are returned
+         with fallback=true and fallbackReason. Safe defaults still honour opt-out and channel consent, and skip
+         offerings that are retired or not offered on the channel.
 servers:
   - url: /tmf-api/recommendationManagement/v4
 paths:
@@ -17,7 +22,9 @@ paths:
         - name: explain
           in: query
           required: false
-          description: When true, the response also lists every suppressed candidate with its stage and reason.
+          description: >
+            When true, each item carries an explanation (model, top feature contributions, value, lever and the
+            priority arithmetic), and the response lists every suppressed candidate with its stage and reason.
           schema: { type: boolean, default: false }
       requestBody:
         required: true
@@ -72,7 +79,36 @@ components:
         score: { type: number, description: Arbitration priority (propensity x value x lever) }
         propensity: { type: number }
         reasonCode: { type: array, items: { type: string } }
+        explanation:
+          description: Only with explain=true
+          $ref: '#/components/schemas/Explanation'
         '@type': { type: string, const: NbaRecommendationItem }
+    Explanation:
+      type: object
+      description: priority = propensity x value x priorityLever, and where the propensity came from.
+      properties:
+        scorer: { type: string, description: 'Scorer plugin type: logistic, remote, or prior when no model was used' }
+        modelName: { type: string }
+        modelVersion: { type: string }
+        modelPropensity: { type: number, description: Propensity from the model, before learning adjusted it }
+        propensity: { type: number, description: Propensity used for arbitration }
+        value: { type: number, description: Business value used (1 for non-monetary actions) }
+        priorityLever: { type: number }
+        priority: { type: number }
+        scoringFallback:
+          type: string
+          description: Set when the model could not be used and the default prior was applied instead
+          enum: [SCORER_UNAVAILABLE, SCORING_ERROR, SCORING_TIMEOUT, SCORING_INVALID_OUTPUT, CIRCUIT_OPEN]
+        contributions:
+          type: array
+          description: Largest feature contributions to the model's log-odds, biggest effect first
+          items:
+            type: object
+            properties:
+              feature: { type: string }
+              value: { type: number }
+              weight: { type: number }
+              contribution: { type: number, description: weight x value }
     SuppressedItem:
       type: object
       properties:
@@ -95,5 +131,9 @@ components:
           description: Only with explain=true
           items: { $ref: '#/components/schemas/SuppressedItem' }
         fallback: { type: boolean, description: True when the safe default answer was returned }
+        fallbackReason:
+          type: string
+          description: Why the safe default was returned (only when fallback is true)
+          enum: [BULKHEAD_FULL, CIRCUIT_OPEN, DEADLINE_EXCEEDED, PIPELINE_ERROR, SCORING_FAILED, INTERRUPTED]
         '@type': { type: string, const: NbaRecommendation }
         '@baseType': { type: string, const: Recommendation }

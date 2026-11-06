@@ -35,6 +35,23 @@ nba:
       wait-in-open-state: 10s
     safe-defaults:
       default: []
+    plugins:
+      propensity-scoring:
+        # Used for actions without a model, and for any model that cannot be scored.
+        default-propensity: 0.05
+        # Budget for all remote model calls of one decision (they run in parallel).
+        timeout: 40ms
+        # prior: fall back per action and keep deciding. safe-default: return the safe default answer instead.
+        on-failure: prior
+      remote-model:
+        # Open Inference Protocol (KServe v2) model server for offerings whose model type is "remote".
+        enabled: ${NBA_MODEL_SERVER_ENABLED:false}
+        base-url: ${NBA_MODEL_SERVER_URL:http://localhost:8085}
+        timeout: 30ms
+        circuit-breaker:
+          failure-rate-threshold: 50
+          minimum-number-of-calls: 20
+          wait-in-open-state: 10s
 
 management:
   endpoints:

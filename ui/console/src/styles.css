@@ -148,6 +148,12 @@ tr:last-child td { border-bottom: none; }
 .scores { display: flex; gap: 24px; margin: 0; }
 .scores dt { font-size: 12px; color: var(--text-muted); }
 .scores dd { margin: 0; font-size: 16px; font-weight: 600; }
+.why { margin: 4px 0; font-size: 13px; }
+.why summary { cursor: pointer; color: var(--text-muted); }
+.why p { margin: 6px 0; }
+.contributions { border-collapse: collapse; margin-top: 4px; }
+.contributions th, .contributions td { padding: 2px 12px 2px 0; text-align: left; }
+.contributions .num { text-align: right; }
 .reasons { margin: 0; padding-left: 18px; color: var(--text-muted); font-size: 13px; }
 .outcomes { display: flex; gap: 6px; flex-wrap: wrap; }
 

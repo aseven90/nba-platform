@@ -45,6 +45,14 @@ final class Fixtures {
         return this;
     }
 
+    static DecisionRequest request(Map<String, Object> attributes) {
+        return new DecisionRequest("acme", "p1", "web", attributes, 3, NOW);
+    }
+
+    static PropensityScoringStage scoring() {
+        return new PropensityScoringStage(List.of(new LogisticScorer()), 0.05);
+    }
+
     DecisionContext context(String partyId, Map<String, Object> attributes, int maxItems) {
         DecisionRequest request = new DecisionRequest("acme", partyId, "web", attributes, maxItems, NOW);
         DecisionSnapshot snapshot = new DecisionSnapshot() {

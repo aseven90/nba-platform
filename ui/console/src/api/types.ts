@@ -13,9 +13,15 @@ export interface ValidFor {
 }
 
 export interface PropensityModel {
+  /** Scorer plugin: logistic (default, evaluated in the decision service) or remote (model server). */
+  type?: 'logistic' | 'remote' | string | null;
+  /** Model name on the model server (remote only). */
+  name?: string | null;
   version?: string;
   intercept: number;
   coefficients: Record<string, number>;
+  /** Ordered model inputs (remote only). */
+  features?: string[] | null;
 }
 
 export interface ProductOffering {
@@ -75,6 +81,28 @@ export interface RecommendationItem {
   score?: number;
   propensity?: number;
   reasonCode: string[];
+  explanation?: Explanation;
+}
+
+export interface Contribution {
+  feature: string;
+  value: number;
+  weight?: number;
+  contribution?: number;
+}
+
+/** priority = propensity × value × priorityLever, and where the propensity came from. */
+export interface Explanation {
+  scorer?: string;
+  modelName?: string;
+  modelVersion?: string;
+  modelPropensity: number;
+  propensity: number;
+  value: number;
+  priorityLever: number;
+  priority: number;
+  scoringFallback?: string;
+  contributions: Contribution[];
 }
 
 export interface SuppressedItem {
@@ -92,6 +120,7 @@ export interface Recommendation {
   recommendationItem: RecommendationItem[];
   suppressedItem?: SuppressedItem[];
   fallback: boolean;
+  fallbackReason?: string;
 }
 
 export type Outcome = 'IMPRESSION' | 'ACCEPTED' | 'DECLINED' | 'IGNORED';
