@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { campaignApi, catalogApi, interactionApi } from '../api/endpoints';
 import { ErrorBanner, Notice, PageHeader } from '../components/ui';
-import { loadDemoData } from '../lib/demoData';
+import { type DemoLoadResult, loadDemoData } from '../lib/demoData';
 import { useTenant } from '../lib/tenant';
 import { useResource } from '../lib/useResource';
 
@@ -32,8 +32,7 @@ export function OverviewPage() {
     setSeeding(true);
     setSeedError(undefined);
     try {
-      const result = await loadDemoData(tenant);
-      setSeeded(`Created ${result.actions} actions and ${result.campaigns} active campaigns.`);
+      setSeeded(describeSeed(await loadDemoData(tenant)));
       await counts.reload();
     } catch (e) {
       setSeedError(e as Error);
@@ -105,4 +104,12 @@ export function OverviewPage() {
       </section>
     </>
   );
+}
+
+function describeSeed({ created, existing }: DemoLoadResult): string {
+  if (created.actions === 0 && created.campaigns === 0) return 'Demo data is already loaded; nothing was added.';
+  const made = `Created ${created.actions} actions and ${created.campaigns} active campaigns.`;
+  const kept = existing.actions + existing.campaigns;
+  if (kept === 0) return made;
+  return `${made} ${kept} demo ${kept === 1 ? 'record was' : 'records were'} already there and kept as is.`;
 }

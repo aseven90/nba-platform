@@ -11,6 +11,14 @@ test('load demo data, then decide and record a response', async ({ page }) => {
   await page.getByRole('button', { name: 'Load demo data' }).click();
   await expect(page.getByText('Created 3 actions and 2 active campaigns.')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Actions 3' })).toBeVisible();
+
+  // Loading again must not duplicate anything.
+  await page.getByRole('button', { name: 'Load demo data' }).click();
+  await expect(page.getByText('Demo data is already loaded; nothing was added.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Actions 3' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Campaigns 2' })).toBeVisible();
+  expect(api.offerings).toHaveLength(3);
+  expect(api.campaigns).toHaveLength(2);
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/1-overview.png`, fullPage: true });
 
   await page.getByRole('link', { name: 'Campaigns', exact: true }).first().click();
@@ -40,6 +48,20 @@ test('load demo data, then decide and record a response', async ({ page }) => {
   await page.getByRole('link', { name: 'Interactions' }).click();
   await expect(page.getByRole('cell', { name: 'ACCEPTED' })).toBeVisible();
   expect([...api.tenants]).toEqual(['demo']);
+});
+
+test('load demo data recreates only what is missing', async ({ page }) => {
+  const api = new FakeApi();
+  api.offerings = [{ id: 'kept-1', name: 'Premium plan upgrade', businessValue: 999 }];
+  await api.install(page);
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Load demo data' }).click();
+  await expect(page.getByText('Created 2 actions and 2 active campaigns. 1 demo record was already there')).toBeVisible();
+  expect(api.offerings).toHaveLength(3);
+  expect(api.offerings[0]).toMatchObject({ id: 'kept-1', businessValue: 999 });
+  const grow = api.campaigns.find((c) => c.name === 'Grow loyal customers') as { action: { actionObjectId: string }[] };
+  expect(grow.action[0].actionObjectId).toBe('kept-1');
 });
 
 test('create and edit an action with a propensity model', async ({ page }) => {
